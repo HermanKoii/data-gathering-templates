@@ -1,0 +1,1238 @@
+
+=== File: .gitignore ===
+
+-- Chunk 1 --
+// /home/herman/git/docs-summarizer/worker/orca-agent/repos/repo_53/.gitignore:1-13
+dist
+build
+node_modules
+package-lock.json
+migrate.sh
+*/dev.js
+data/*
+executables/*
+namespace/*
+config/*
+.env
+taskStateInfoKeypair.json
+localKOIIDB
+
+=== File: namespaceWrapper.js ===
+
+-- Chunk 1 --
+// namespaceWrapper.js:8-157
+class NamespaceWrapper {
+  levelDB;
+
+  constructor() {
+    if(taskNodeAdministered){
+      this.getTaskLevelDBPath().then((path)=>{
+        this.levelDB = levelup(leveldown(path));
+      }).catch((err)=>{
+        console.error(err)
+        this.levelDB=levelup(leveldown(`../namespace/${TASK_ID}/KOIILevelDB`))
+      })
+    }else{
+      this.levelDB = levelup(leveldown('./localKOIIDB'));
+    }
+  }
+  /**
+   * Namespace wrapper of storeGetAsync
+   * @param {string} key // Path to get
+   */
+  async storeGet(key) {
+    return new Promise((resolve, reject) => {
+      this.levelDB.get(key, { asBuffer: false }, (err, value) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(value);
+        }
+      });
+    });
+  }
+  /**
+   * Namespace wrapper over storeSetAsync
+   * @param {string} key Path to set
+   * @param {*} value Data to set
+   */
+  async storeSet(key, value) {
+    return new Promise((resolve, reject) => {
+      this.levelDB.put(key, value, {}, err => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+  /**
+   * Namespace wrapper over fsPromises methods
+   * @param {*} method The fsPromise method to call
+   * @param {*} path Path for the express call
+   * @param  {...any} args Remaining parameters for the FS call
+   */
+  async fs(method, path, ...args) {
+    return await genericHandler('fs', method, path, ...args);
+  }
+  async fsStaking(method, path, ...args) {
+    return await genericHandler('fsStaking', method, path, ...args);
+  }
+  async fsWriteStream(imagepath) {
+    return await genericHandler('fsWriteStream', imagepath);
+  }
+  async fsReadStream(imagepath) {
+    return await genericHandler('fsReadStream', imagepath);
+  }
+
+  async getSlot() {
+    return await genericHandler('getCurrentSlot');
+  }
+
+  async submissionOnChain(submitterKeypair, submission) {
+    return await genericHandler(
+      'submissionOnChain',
+      submitterKeypair,
+      submission,
+    );
+  }
+
+  async stakeOnChain(
+    taskStateInfoPublicKey,
+    stakingAccKeypair,
+    stakePotAccount,
+    stakeAmount,
+  ) {
+    return await genericHandler(
+      'stakeOnChain',
+      taskStateInfoPublicKey,
+      stakingAccKeypair,
+      stakePotAccount,
+      stakeAmount,
+    );
+  }
+  async claimReward(stakePotAccount, beneficiaryAccount, claimerKeypair) {
+    return await genericHandler(
+      'claimReward',
+      stakePotAccount,
+      beneficiaryAccount,
+      claimerKeypair,
+    );
+  }
+  async sendTransaction(serviceNodeAccount, beneficiaryAccount, amount) {
+    return await genericHandler(
+      'sendTransaction',
+      serviceNodeAccount,
+      beneficiaryAccount,
+      amount,
+    );
+  }
+
+  async getSubmitterAccount() {
+    const submitterAccountResp = await genericHandler('getSubmitterAccount');
+    return Keypair.fromSecretKey(
+      Uint8Array.from(Object.values(submitterAccountResp._keypair.secretKey)),
+    );
+  }
+
+  /**
+   * sendAndConfirmTransaction wrapper that injects mainSystemWallet as the first signer for paying the tx fees
+   * @param {connection} method // Receive method ["get", "post", "put", "delete"]
+   * @param {transaction} path // Endpoint path appended to namespace
+   * @param {Function} callback // Callback function on traffic receive
+   */
+  async sendAndConfirmTransactionWrapper(transaction, signers) {
+    const blockhash = (await connection.getRecentBlockhash('finalized'))
+      .blockhash;
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = new PublicKey(MAIN_ACCOUNT_PUBKEY);
+    return await genericHandler(
+      'sendAndConfirmTransactionWrapper',
+      transaction.serialize({
+        requireAllSignatures: false,
+        verifySignatures: false,
+      }),
+      signers,
+    );
+  }
+
+  async signArweave(transaction) {
+    let tx = await genericHandler('signArweave', transaction.toJSON());
+    return arweave.transactions.fromRaw(tx);
+  }
+  async signEth(transaction) {
+    return await genericHandler('signEth', transaction);
+  }
+  async getTaskState() {
+    const response = await genericHandler('getTaskState');
+    if (response.error) {
+      return null;
+    }
+    return response;
+  }
+
+-- Chunk 2 --
+// namespaceWrapper.js:158-307
+
+  async auditSubmission(candidatePubkey, isValid, voterKeypair, round) {
+    return await genericHandler(
+      'auditSubmission',
+      candidatePubkey,
+      isValid,
+      voterKeypair,
+      round,
+    );
+  }
+
+  async distributionListAuditSubmission(
+    candidatePubkey,
+    isValid,
+    voterKeypair,
+    round,
+  ) {
+    return await genericHandler(
+      'distributionListAuditSubmission',
+      candidatePubkey,
+      isValid,
+      round,
+    );
+  }
+
+  async getRound() {
+    return await genericHandler('getRound');
+  }
+
+  async nodeSelectionDistributionList() {
+    return await genericHandler('nodeSelectionDistributionList');
+  }
+
+  async payoutTrigger() {
+    return await genericHandler('payloadTrigger');
+  }
+
+  async uploadDistributionList(distributionList, round) {
+    return await genericHandler(
+      'uploadDistributionList',
+      distributionList,
+      round,
+    );
+  }
+
+  async distributionListSubmissionOnChain(round) {
+    return await genericHandler('distributionListSubmissionOnChain', round);
+  }
+
+  async payloadTrigger() {
+    return await genericHandler('payloadTrigger');
+  }
+
+  async checkSubmissionAndUpdateRound(submissionValue = 'default', round) {
+    return await genericHandler(
+      'checkSubmissionAndUpdateRound',
+      submissionValue,
+      round,
+    );
+  }
+  async getProgramAccounts() {
+    return await genericHandler('getProgramAccounts');
+  }
+  async defaultTaskSetup() {
+    return await genericHandler('defaultTaskSetup');
+  }
+  async getRpcUrl() {
+    return await genericHandler('getRpcUrl');
+  }
+  async getNodes(url) {
+    return await genericHandler('getNodes', url);
+  }
+
+  // Wrapper for selection of node to prepare a distribution list
+
+  async nodeSelectionDistributionList(round) {
+    return await genericHandler('nodeSelectionDistributionList', round);
+  }
+
+  async getDistributionList(publicKey, round) {
+    const response = await genericHandler(
+      'getDistributionList',
+      publicKey,
+      round,
+    );
+    if (response.error) {
+      return null;
+    }
+    return response;
+  }
+
+  async validateAndVoteOnNodes(validate, round) {
+    // await this.checkVoteStatus();
+    console.log('******/  IN VOTING /******');
+    const taskAccountDataJSON = await this.getTaskState();
+
+    console.log(
+      'Fetching the submissions of N - 1 round',
+      taskAccountDataJSON.submissions[round],
+    );
+    const submissions = taskAccountDataJSON.submissions[round];
+    if (submissions == null) {
+      console.log('No submisssions found in N-1 round');
+      return 'No submisssions found in N-1 round';
+    } else {
+      const keys = Object.keys(submissions);
+      const values = Object.values(submissions);
+      const size = values.length;
+      console.log('Submissions from last round: ', keys, values, size);
+      let isValid;
+      const submitterAccountKeyPair = await this.getSubmitterAccount();
+      const submitterPubkey = submitterAccountKeyPair.publicKey.toBase58();
+      for (let i = 0; i < size; i++) {
+        let candidatePublicKey = keys[i];
+        console.log('FOR CANDIDATE KEY', candidatePublicKey);
+        let candidateKeyPairPublicKey = new PublicKey(keys[i]);
+        if (candidatePublicKey == submitterPubkey) {
+          console.log('YOU CANNOT VOTE ON YOUR OWN SUBMISSIONS');
+        } else {
+          try {
+            console.log(
+              'SUBMISSION VALUE TO CHECK',
+              values[i].submission_value,
+            );
+            isValid = await validate(values[i].submission_value, round);
+            console.log(`Voting ${isValid} to ${candidatePublicKey}`);
+
+            if (isValid) {
+              // check for the submissions_audit_trigger , if it exists then vote true on that otherwise do nothing
+              const submissions_audit_trigger =
+                taskAccountDataJSON.submissions_audit_trigger[round];
+              console.log('SUBMIT AUDIT TRIGGER', submissions_audit_trigger);
+              // console.log(
+              //   "CANDIDATE PUBKEY CHECK IN AUDIT TRIGGER",
+              //   submissions_audit_trigger[candidatePublicKey]
+              // );
+              if (
+                submissions_audit_trigger &&
+                submissions_audit_trigger[candidatePublicKey]
+              ) {
+                console.log('VOTING TRUE ON AUDIT');
+                const response = await this.auditSubmission(
+                  candidateKeyPairPublicKey,
+                  isValid,
+                  submitterAccountKeyPair,
+                  round,
+                );
+                console.log('RESPONSE FROM AUDIT FUNCTION', response);
+              }
+            } else if (isValid == false) {
+
+-- Chunk 3 --
+// namespaceWrapper.js:308-423
+              // Call auditSubmission function and isValid is passed as false
+              console.log('RAISING AUDIT / VOTING FALSE');
+              const response = await this.auditSubmission(
+                candidateKeyPairPublicKey,
+                isValid,
+                submitterAccountKeyPair,
+                round,
+              );
+              console.log('RESPONSE FROM AUDIT FUNCTION', response);
+            }
+          } catch (err) {
+            console.log('ERROR IN ELSE CONDITION', err);
+          }
+        }
+      }
+    }
+  }
+
+  async validateAndVoteOnDistributionList(validateDistribution, round) {
+    // await this.checkVoteStatus();
+    console.log('******/  IN VOTING OF DISTRIBUTION LIST /******');
+    const taskAccountDataJSON = await this.getTaskState();
+    console.log(
+      'Fetching the Distribution submissions of N - 2 round',
+      taskAccountDataJSON.distribution_rewards_submission[round],
+    );
+    const submissions =
+      taskAccountDataJSON.distribution_rewards_submission[round];
+    if (submissions == null) {
+      console.log('No submisssions found in N-2 round');
+      return 'No submisssions found in N-2 round';
+    } else {
+      const keys = Object.keys(submissions);
+      const values = Object.values(submissions);
+      const size = values.length;
+      console.log(
+        'Distribution Submissions from last round: ',
+        keys,
+        values,
+        size,
+      );
+      let isValid;
+      const submitterAccountKeyPair = await this.getSubmitterAccount();
+      const submitterPubkey = submitterAccountKeyPair.publicKey.toBase58();
+
+      for (let i = 0; i < size; i++) {
+        let candidatePublicKey = keys[i];
+        console.log('FOR CANDIDATE KEY', candidatePublicKey);
+        let candidateKeyPairPublicKey = new PublicKey(keys[i]);
+        if (candidatePublicKey == submitterPubkey) {
+          console.log('YOU CANNOT VOTE ON YOUR OWN DISTRIBUTION SUBMISSIONS');
+        } else {
+          try {
+            console.log(
+              'DISTRIBUTION SUBMISSION VALUE TO CHECK',
+              values[i].submission_value,
+            );
+            isValid = await validateDistribution(
+              values[i].submission_value,
+              round,
+            );
+            console.log(`Voting ${isValid} to ${candidatePublicKey}`);
+
+            if (isValid) {
+              // check for the submissions_audit_trigger , if it exists then vote true on that otherwise do nothing
+              const distributions_audit_trigger =
+                taskAccountDataJSON.distributions_audit_trigger[round];
+              console.log(
+                'SUBMIT DISTRIBUTION AUDIT TRIGGER',
+                distributions_audit_trigger,
+              );
+              // console.log(
+              //   "CANDIDATE PUBKEY CHECK IN AUDIT TRIGGER",
+              //   distributions_audit_trigger[candidatePublicKey]
+              // );
+              if (
+                distributions_audit_trigger &&
+                distributions_audit_trigger[candidatePublicKey]
+              ) {
+                console.log('VOTING TRUE ON DISTRIBUTION AUDIT');
+                const response = await this.distributionListAuditSubmission(
+                  candidateKeyPairPublicKey,
+                  isValid,
+                  submitterAccountKeyPair,
+                  round,
+                );
+                console.log(
+                  'RESPONSE FROM DISTRIBUTION AUDIT FUNCTION',
+                  response,
+                );
+              }
+            } else if (isValid == false) {
+              // Call auditSubmission function and isValid is passed as false
+              console.log('RAISING AUDIT / VOTING FALSE ON DISTRIBUTION');
+              const response = await this.distributionListAuditSubmission(
+                candidateKeyPairPublicKey,
+                isValid,
+                submitterAccountKeyPair,
+                round,
+              );
+              console.log(
+                'RESPONSE FROM DISTRIBUTION AUDIT FUNCTION',
+                response,
+              );
+            }
+          } catch (err) {
+            console.log('ERROR IN ELSE CONDITION FOR DISTRIBUTION', err);
+          }
+        }
+      }
+    }
+  }
+  async getTaskLevelDBPath() {
+    return await genericHandler('getTaskLevelDBPath');
+  }
+}
+
+-- Chunk 4 --
+// namespaceWrapper.js:425-442
+async function genericHandler(...args) {
+  try {
+    let response = await axios.post(BASE_ROOT_URL, {
+      args,
+      taskId: TASK_ID,
+      secret: SECRET_KEY,
+    });
+    if (response.status == 200) return response.data.response;
+    else {
+      console.error(response.status, response.data);
+      return null;
+    }
+  } catch (err) {
+    console.error(`Error in genericHandler: "${args[0]}"`, err.message);
+    console.error(err?.response?.data);
+    return { error: err };
+  }
+}
+
+-- Chunk 5 --
+// namespaceWrapper.js:446-449
+rpcUrl => {
+    console.log(rpcUrl, 'RPC URL');
+    connection = new Connection(rpcUrl, 'confirmed');
+  }
+
+=== File: README.md ===
+
+-- Chunk 1 --
+// /home/herman/git/docs-summarizer/worker/orca-agent/repos/repo_53/README.md:1-113
+# K2-Task-Template
+
+Tasks run following a periodic structure of 'rounds':
+
+![Screenshot_20230307-091958](https://user-images.githubusercontent.com/66934242/223565192-3ecce9c6-0f9a-4a58-8b02-2db19c61141f.png)
+
+Each round is set by a specific time period, and nodes participate by uploading data to IPFS, posting CIDs to the K2 settlement layer, and sending messages across REST APIs and WebSockets.
+
+For more information on how the Task Flow works, check out [the runtime environment docs](https://docs.koii.network/develop/microservices-and-tasks/what-are-tasks/gradual-consensus#why-is-it-gradual).
+
+If this is your first time writing a Koii Task, you might want to use the [task organizer](https://www.figma.com/community/file/1220194939977550205/Task-Outline).
+
+## Requirements
+
+- [Node >=16.0.0](https://nodejs.org)
+- [Docker compose](https://docs.docker.com/compose/install/docker)
+
+## What's in the template?
+
+`index.js` is the hub of your app, and ties together the other pieces. This will be the entrypoint when your task runs on Task Nodes
+
+`NamespaceWrappers.js` contains the interfaces to make API calls to the core of the task-node. It contains all the necessary functions required to submit and audit the work, as well as the distribution lists
+
+`coreLogic.js` is where you'll define your task, audit, and distribution logic, and controls the majority of task functionality. You can of course break out separate features into sub-files and import them into the core logic before web-packing.
+
+## Runtime Options
+
+There are two ways to run your task when doing development:
+
+1. With GLOBAL_TIMERS="true" (see .env-local)- When the timer is true, IPC calls are made by calculating the average time slots of all the task running your node.
+
+2. With GLOBAL_TIMERS="false" - This allows you to do manual calls to K2 and disables the triggers for round managemnt on K2. Transactions are only accepted during the correct period. Guide for manual calls is in index.js
+
+# Modifying CoreLogic.js
+
+Task nodes will trigger a set of predefined functions during operation.
+
+There are in total 9 functions in CoreLogic which the you can modify according to your needs:
+
+1. _task()_ - The logic for what your task should do goes here. There is a window in round that is dedicated to do work. The code in task is executed in that window.
+
+2. _fetchSubmission()_ - After completing the task , the results/work will be stored somewhere like on IPFS or local levelDB. This function is the place where you can write the logic to fetch that work. It is called in submitTask() function which does the actual submission on K2.
+
+3. _submitTask()_ - It makes the call to namespace function of task-node using the wrapper.
+
+4. _generateDistributionList()_ - You have full freedom to prepare your reward distributions as you like and the logic for that goes here. We have provided a sample logic that rewards 1 KOII to all the needs who did the correct submission for that round. This function is called in submitDistributionList()
+
+5. _submitDistributionList()_ - makes call to the namesapce function of task-node to upload the list and on succesful upload does the transaction to update the state.
+
+6. _validateNode()_ - this function is called to verify the submission value, so based on the value received from the task-state we can vote on the submission.
+
+7. _validateDistribution()_ - The logic to validate the distribution list goes here and the function will receive the distribution list submitted form task-state.
+
+8. _auditTask()_ - makes call to namespace of task-node to raise an audit against the submission value if the validation fails.
+
+9. _auditDistribution()_ - makes call to namespace of task-node to raise an audit against the distribution list if the validation fails.
+
+# Testing and Deploying
+
+Before you begin this process, be sure to check your code and write unit tests wherever possible to verify individual core logic functions. Testing using the docker container should be mostly used for consensus flows, as it will take longer to rebuild and re-deploy the docker container.
+
+## Build
+
+Before deploying a task, you'll need to build it into a single file executable by running
+`yarn webpack`
+
+## Deploy your bundle
+
+Complete the following to deploy your task on the k2 testnet and test it locally with docker compose.
+
+### To get a web3.storage key
+
+If you have already created an account on [web3.storage](https://web3.storage/docs/#quickstart) you'll just need to enter the API key after the prompts in the deploy process.
+
+### Find or create a k2 wallet key
+
+If you have already generated a Koii wallet on yoru filesystem you can obtain the path to it by running `koii config get` which should return something similar to the following:
+
+![截图 2023-03-07 18-13-17](https://user-images.githubusercontent.com/66934242/223565661-ece1591f-2189-4369-8d2a-53393da15834.png)
+
+The `Keypair Path` will be used to pay gas fees and fund your bounty wallet by inputting it into the task CLI.
+
+If you need to create a Koii wallet you can follow the instructions [here](https://docs.koii.network/develop/koii-software-toolkit-sdk/using-the-cli#create-a-koii-wallet). Make sure to either copy your keypair path from the output, or use the method above to supply the task CLI with the proper wallet path.
+
+### Deploy to K2
+
+To test the task with the [K2 Settlement Layer](https://docs.koii.network/develop/settlement-layer/k2-tick-tock-fast-blocks#docusaurus_skipToContent_fallback) you'll need to deploy it.
+
+To publish tasks to the K2 network use `npx @_koii/create-task-cli` . You have two options to create your task using `config-task.yml` and using the `cli`. Check out the sample `config-task.yml` attached in this repo, by default it will look for both `config-task.yml` and `id.json` in your current directory and if not deteched you will have an option to enter your path. Tips on this flow and detailed meaning of each task parameter can be found [in the docs](https://docs.koii.network/develop/koii-software-toolkit-sdk/create-task-cli). One important thing to note is when you're presented with the choice of ARWEAVE, IPFS, or DEVELOPMENT you can select DEVELOPMENT and enter `main` in the following prompt. This will tell the task node to look for a `main.js` file in the `dist` folder. You can create this locally by running `yarn webpack`.
+
+## Run a node locally
+
+If you want to get a closer look at the console and test environment variables, you'll want to use the included docker-compose stack to run a task node locally.
+
+1. Link or copy your wallet into the `config` folder as `id.json`
+2. Open `.env-local` and add your TaskID you obtained after deploying to K2 into the `TASKS` environment variable.\
+3. Run `docker compose up` and watch the output of the `task_node`. You can exit this process when your task has finished, or any other time if you have a long running persistent task.
+
+### Redeploying
+
+You do not need to publish your task every time you make modifications. You do however need to restart the `task_node` in order for the latest code to be used. To prepare your code you can run `yarn webpack` to create the bundle. If you have a `task_node` ruinning already, you can exit it and then run `docker compose up` to restart (or start) the node.
+
+### Environment variables
+
+Open the `.env-local` file and make any modifications you need. You can include environment variables that your task expects to be present here, in case you're using [custom secrets](https://docs.koii.network/develop/microservices-and-tasks/task-development-kit-tdk/using-the-task-namespace/keys-and-secrets).
+
+### API endpoints
+
+By default your API's will be exposed on base URL: http://localhost:8080/task/{TASKID}
+
+You can check out the state of your task using the default API : http://localhost:8080/task/{TASKID}/taskState
+
+`TASKID` is the id that you get when you create your task using `npx`
+
+=== File: webpack.config.js ===
+
+-- Chunk 1 --
+// /home/herman/git/docs-summarizer/worker/orca-agent/repos/repo_53/webpack.config.js:1-17
+module.exports={
+    entry:"./index.js",
+    target: 'node',
+    // When uploading to arweave use the production mode
+    // mode:"production",
+    mode: "development",
+    devtool: 'source-map',
+    optimization: {
+        usedExports: false, // <- no remove unused function
+    },
+    stats:{
+      moduleTrace:false
+    },
+    node:{
+      __dirname: true
+    }
+}
+
+=== File: init.js ===
+
+-- Chunk 1 --
+// init.js:15-17
+(req, res) => {
+  res.send('Hello World!');
+}
+
+-- Chunk 2 --
+// init.js:19-21
+() => {
+  console.log(`${TASK_NAME} listening on port ${EXPRESS_PORT}`);
+}
+
+=== File: docker-compose.yaml ===
+
+-- Chunk 1 --
+// /home/herman/git/docs-summarizer/worker/orca-agent/repos/repo_53/docker-compose.yaml:1-42
+version: '3.2'
+services:
+  redis:
+    image: redis:alpine
+    container_name: redis
+    command: redis-server --appendonly yes
+    ports:
+      - 6379:6379
+    volumes:
+      - redis_data:/data/
+    restart: always
+    networks:
+      - task_net
+
+  task_node:
+    image: public.ecr.aws/koii-network/task_node:latest
+    command: yarn initialize-start
+    depends_on: 
+      - redis
+    ports:
+      - '8080:8080'
+    env_file: .env-local
+
+    container_name: task_node
+    restart: always
+    links:
+      - redis:redis
+    networks:
+      - task_net
+    volumes:
+      - ./config/koii:/app/config
+      - ./data:/app/data
+      - ./namespace:/app/namespace
+      - ./dist:/app/executables
+   
+networks:
+  task_net:
+    name: task_net
+    driver: bridge
+
+volumes:
+  redis_data:
+
+=== File: .prettierrc ===
+
+-- Chunk 1 --
+// /home/herman/git/docs-summarizer/worker/orca-agent/repos/repo_53/.prettierrc:1-12
+{
+    "printWidth": 80,
+    "tabWidth": 2,
+    "useTabs": false,
+    "semi": true,
+    "singleQuote": true,
+    "trailingComma": "all",
+    "bracketSpacing": true,
+    "jsxBracketSameLine": false,
+    "arrowParens": "avoid",
+    "endOfLine": "auto"
+  }
+
+=== File: config-task.yml ===
+
+-- Chunk 1 --
+// /home/herman/git/docs-summarizer/worker/orca-agent/repos/repo_53/config-task.yml:1-66
+#Provide the taskId if you are updating the task
+task_id: ''
+# Name and desciption of your task
+task_name: 'Your-task-name'
+task_description: 'This task is to test out the namespace function'
+
+# network value can be DEVELOPMENT , ARWEAVE or IPFS
+task_executable_network: 'DEVELOPMENT'
+
+# Provide your web3.storage key as it is needed for uploading your metadata
+secret_web3_storage_key: ''
+
+# Path to your executable webpack if the selected network is IPFS otherwise leave blank
+task_audit_program: ''
+
+# Provide your transaction ID in case of ARWEAVE and in case of DEVELOPMENT give your executable name as main otherwise leave blank
+task_audit_program_id: 'main'
+
+# Total round time of your task : it must be given in slots and each slot is rougly equal to 4ms
+round_time: 600
+
+audit_window: 200
+submission_window: 200
+
+# Amounts in KOII
+
+minimum_stake_amount: 5
+
+# total_bounty_amount cannot be grater than bounty_amount_per_round
+# total bounty is not accepted in case of update task
+total_bounty_amount: 10
+
+bounty_amount_per_round: 1
+
+#Number of times allowed to re-submit the distribution  list in case the distribution list is audited
+allowed_failed_distributions: 4
+
+#Space in MBs
+space: 10
+
+# Note that the value field in RequirementTag is optional, so it is up to you to include it or not based on your use case.
+# To add more global variables and task variables, please refer the type,value,description format shown below
+
+author: 'Your name'
+description: 'task-description'
+repositoryUrl: 'Github/gitlab link'
+imageUrl: 'Enter you image URL'
+requirementsTags:
+  - type: GLOBAL_VARIABLE
+    value: 'WEB3.STORAGE SECRET KEY'
+    description: 'used to connect web3.storage'
+  - type: TASK_VARIABLE
+    value: 'SCAPING URL'
+    description: 'url from which you want to scrape'
+  - type: CPU
+    value: '4-core'
+  - type: RAM
+    value: '5 GB'
+  - type: STORAGE
+    value: 'test'
+  - type: NETWORK
+    value: 'test'
+  - type: ARCHITECTURE
+    value: 'AMD'
+  - type: OS
+    value: 'OSX'
+
+=== File: package.json ===
+
+-- Chunk 1 --
+// /home/herman/git/docs-summarizer/worker/orca-agent/repos/repo_53/package.json:1-29
+{
+  "name": "js_app_deploy",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js",
+    "webpack": "webpack",
+    "webpack:prod": "webpack --mode production"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@_koi/web3.js": "^0.0.6",
+    "@_koii/create-task-cli": "^0.1.12",
+    "axios": "^0.27.2",
+    "express": "^4.18.1",
+    "leveldown": "^6.1.1",
+    "levelup": "^5.1.1",
+    "node-cron": "^3.0.2",
+    "request": "^2.88.2",
+    "web3.storage": "^4.4.0"
+  },
+  "devDependencies": {
+    "webpack": "^5.28.0",
+    "webpack-cli": "^4.5.0"
+  }
+}
+
+=== File: coreLogic.js ===
+
+-- Chunk 1 --
+// coreLogic.js:4-153
+class CoreLogic {
+  async task() {
+    // Write the logic to do the work required for submitting the values and optionally store the result in levelDB
+
+    // Below is just a sample of work that a task can do
+
+    try {
+      const x = Math.random().toString(); // generate random number and convert to string
+      const cid = crypto.createHash('sha1').update(x).digest('hex'); // convert to CID
+      console.log('HASH:', cid);
+
+      // fetching round number to store work accordingly
+
+      if (cid) {
+        await namespaceWrapper.storeSet('cid', cid); // store CID in levelDB
+      }
+    } catch (err) {
+      console.log('ERROR IN EXECUTING TASK', err);
+    }
+  }
+  async fetchSubmission() {
+    // Write the logic to fetch the submission values here and return the cid string
+
+    // fetching round number to store work accordingly
+
+    console.log('IN FETCH SUBMISSION');
+
+    // The code below shows how you can fetch your stored value from level DB
+
+    const cid = await namespaceWrapper.storeGet('cid'); // retrieves the cid
+    console.log('CID', cid);
+    return cid;
+  }
+
+  async generateDistributionList(round, _dummyTaskState) {
+    try {
+      console.log('GenerateDistributionList called');
+      console.log('I am selected node');
+
+      // Write the logic to generate the distribution list here by introducing the rules of your choice
+
+      /*  **** SAMPLE LOGIC FOR GENERATING DISTRIBUTION LIST ******/
+
+      let distributionList = {};
+      let taskAccountDataJSON = await namespaceWrapper.getTaskState();
+      if (taskAccountDataJSON == null) taskAccountDataJSON = _dummyTaskState;
+      const submissions = taskAccountDataJSON.submissions[round];
+      const submissions_audit_trigger =
+        taskAccountDataJSON.submissions_audit_trigger[round];
+      if (submissions == null) {
+        console.log('No submisssions found in N-2 round');
+        return distributionList;
+      } else {
+        const keys = Object.keys(submissions);
+        const values = Object.values(submissions);
+        const size = values.length;
+        console.log('Submissions from last round: ', keys, values, size);
+        for (let i = 0; i < size; i++) {
+          const candidatePublicKey = keys[i];
+          if (
+            submissions_audit_trigger &&
+            submissions_audit_trigger[candidatePublicKey]
+          ) {
+            console.log(
+              submissions_audit_trigger[candidatePublicKey].votes,
+              'distributions_audit_trigger votes ',
+            );
+            const votes = submissions_audit_trigger[candidatePublicKey].votes;
+            let numOfVotes = 0;
+            for (let index = 0; index < votes.length; index++) {
+              if (votes[index].is_valid) numOfVotes++;
+              else numOfVotes--;
+            }
+            if (numOfVotes < 0) continue;
+          }
+          distributionList[candidatePublicKey] = 1;
+        }
+      }
+      console.log('Distribution List', distributionList);
+      return distributionList;
+    } catch (err) {
+      console.log('ERROR IN GENERATING DISTRIBUTION LIST', err);
+    }
+  }
+
+  async submitDistributionList(round) {
+    // This function just upload your generated dustribution List and do the transaction for that
+
+    console.log('SubmitDistributionList called');
+
+    try {
+      const distributionList = await this.generateDistributionList(round);
+
+      const decider = await namespaceWrapper.uploadDistributionList(
+        distributionList,
+        round,
+      );
+      console.log('DECIDER', decider);
+
+      if (decider) {
+        const response =
+          await namespaceWrapper.distributionListSubmissionOnChain(round);
+        console.log('RESPONSE FROM DISTRIBUTION LIST', response);
+      }
+    } catch (err) {
+      console.log('ERROR IN SUBMIT DISTRIBUTION', err);
+    }
+  }
+
+  async validateNode(submission_value, round) {
+    // Write your logic for the validation of submission value here and return a boolean value in response
+
+    // The sample logic can be something like mentioned below to validate the submission
+
+    // try{
+
+    console.log('Received submission_value', submission_value, round);
+    // const generatedValue = await namespaceWrapper.storeGet("cid");
+    // console.log("GENERATED VALUE", generatedValue);
+    // if(generatedValue == submission_value){
+    //   return true;
+    // }else{
+    //   return false;
+    // }
+    // }catch(err){
+    //   console.log("ERROR  IN VALDIATION", err);
+    //   return false;
+    // }
+
+    // For succesfull flow we return true for now
+    return true;
+  }
+
+  async shallowEqual(object1, object2) {
+    const keys1 = Object.keys(object1);
+    const keys2 = Object.keys(object2);
+    if (keys1.length !== keys2.length) {
+      return false;
+    }
+    for (let key of keys1) {
+      if (object1[key] !== object2[key]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  validateDistribution = async (
+    distributionListSubmitter,
+    round,
+
+-- Chunk 2 --
+// coreLogic.js:154-234
+    _dummyDistributionList,
+    _dummyTaskState,
+  ) => {
+    // Write your logic for the validation of submission value here and return a boolean value in response
+    // this logic can be same as generation of distribution list function and based on the comparision will final object , decision can be made
+
+    try {
+      console.log('Distribution list Submitter', distributionListSubmitter);
+      const rawDistributionList = await namespaceWrapper.getDistributionList(
+        distributionListSubmitter,
+        round,
+      );
+      let fetchedDistributionList;
+      if (rawDistributionList == null) {
+        fetchedDistributionList = _dummyDistributionList;
+      } else {
+        fetchedDistributionList = JSON.parse(rawDistributionList);
+      }
+      console.log('FETCHED DISTRIBUTION LIST', fetchedDistributionList);
+      const generateDistributionList = await this.generateDistributionList(
+        round,
+        _dummyTaskState,
+      );
+
+      // compare distribution list
+
+      const parsed = fetchedDistributionList;
+      console.log(
+        'compare distribution list',
+        parsed,
+        generateDistributionList,
+      );
+      const result = await this.shallowEqual(parsed, generateDistributionList);
+      console.log('RESULT', result);
+      return result;
+    } catch (err) {
+      console.log('ERROR IN VALIDATING DISTRIBUTION', err);
+      return false;
+    }
+  };
+  // Submit Address with distributioon list to K2
+  async submitTask(roundNumber) {
+    console.log('submitTask called with round', roundNumber);
+    try {
+      console.log('inside try');
+      console.log(
+        await namespaceWrapper.getSlot(),
+        'current slot while calling submit',
+      );
+      const submission = await this.fetchSubmission();
+      console.log('SUBMISSION', submission);
+      await namespaceWrapper.checkSubmissionAndUpdateRound(
+        submission,
+        roundNumber,
+      );
+      console.log('after the submission call');
+    } catch (error) {
+      console.log('error in submission', error);
+    }
+  }
+
+  async auditTask(roundNumber) {
+    console.log('auditTask called with round', roundNumber);
+    console.log(
+      await namespaceWrapper.getSlot(),
+      'current slot while calling auditTask',
+    );
+    await namespaceWrapper.validateAndVoteOnNodes(
+      this.validateNode,
+      roundNumber,
+    );
+  }
+
+  async auditDistribution(roundNumber) {
+    console.log('auditDistribution called with round', roundNumber);
+    await namespaceWrapper.validateAndVoteOnDistributionList(
+      this.validateDistribution,
+      roundNumber,
+    );
+  }
+}
+
+=== File: index.js ===
+
+-- Chunk 1 --
+// index.js:8-76
+async function setup() {
+  console.log('setup function called');
+  // Run default setup
+  await namespaceWrapper.defaultTaskSetup();
+  process.on('message', m => {
+    console.log('CHILD got message:', m);
+    if (m.functionCall == 'submitPayload') {
+      console.log('submitPayload called');
+      coreLogic.submitTask(m.roundNumber);
+    } else if (m.functionCall == 'auditPayload') {
+      console.log('auditPayload called');
+      coreLogic.auditTask(m.roundNumber);
+    } else if (m.functionCall == 'executeTask') {
+      console.log('executeTask called');
+      coreLogic.task();
+    } else if (m.functionCall == 'generateAndSubmitDistributionList') {
+      console.log('generateAndSubmitDistributionList called');
+      coreLogic.submitDistributionList(m.roundNumber);
+    } else if (m.functionCall == 'distributionListAudit') {
+      console.log('distributionListAudit called');
+      coreLogic.auditDistribution(m.roundNumber);
+    }
+  });
+
+  /* GUIDE TO CALLS K2 FUNCTIONS MANUALLY
+
+  If you wish to do the development by avoiding the timers then you can do the intended calls to K2 
+  directly using these function calls. 
+
+  To disable timers please set the TIMERS flag in task-node ENV to disable
+
+  NOTE : K2 will still have the windows to accept the submission value, audit, so you are expected
+  to make calls in the intended slots of your round time. 
+
+  */
+
+  // Get the task state
+  //console.log(await namespaceWrapper.getTaskState());
+
+  //GET ROUND
+
+  // const round = await namespaceWrapper.getRound();
+  // console.log("ROUND", round);
+
+  // Call to do the work for the task
+
+  //await coreLogic.task();
+
+  // Submission to K2 (Preferablly you should submit the cid received from IPFS)
+
+  //await coreLogic.submitTask(round - 1);
+
+  // Audit submissions
+
+  //await coreLogic.auditTask(round - 1);
+
+  // upload distribution list to K2
+
+  //await coreLogic.submitDistributionList(round - 2)
+
+  // Audit distribution list
+
+  //await coreLogic.auditDistribution(round - 2);
+
+  // Payout trigger
+
+  // const responsePayout = await namespaceWrapper.payoutTrigger();
+  // console.log("RESPONSE TRIGGER", responsePayout);
+}
+
+-- Chunk 2 --
+// index.js:88-93
+async (req, res) => {
+    const state = await namespaceWrapper.getTaskState();
+    console.log('TASK STATE', state);
+
+    res.status(200).json({ taskState: state });
+  }
+
+=== File: .env-local ===
+
+-- Chunk 1 --
+// /home/herman/git/docs-summarizer/worker/orca-agent/repos/repo_53/.env-local:1-50
+######################################################
+################## DO NOT EDIT BELOW #################
+######################################################
+# Location of main wallet
+WALLET_LOCATION="/app/config/id.json"
+# Node Mode
+NODE_MODE="service"
+# The nodes address
+SERVICE_URL="http://localhost:8080"
+# For CI/CD purpose to automate the staking wallet creation
+INITIAL_STAKING_WALLET_BALANCE=1
+# Intial balance for the distribution wallet which will be used to hold the distribution list. 
+INITIAL_DISTRIBUTION_WALLET_BALANCE=1
+# Global timers which track the round time, submission window and audit window and call those functions
+GLOBAL_TIMERS="true"
+# environment
+ENVIRONMENT="development"
+# HAVE_STATIC_IP is flag to indicate you can run tasks that host APIs
+# HAVE_STATIC_IP=true
+# To be used when developing your tasks locally and don't want them to be whitelisted by koii team yet
+RUN_NON_WHITELISTED_TASKS=true
+# Connection info for redis
+REDIS_IP="redis"
+REDIS_PORT=6379
+REDIS_PASSWORD=""
+# The address of the main trusted node
+# TRUSTED_SERVICE_URL="https://k2-tasknet.koii.live"
+# Location of K2 node
+K2_NODE_URL="https://k2-testnet.koii.live"
+######################################################
+################ DO NOT EDIT ABOVE ###################
+######################################################
+
+# Tasks to run and their stakes. This is the varaible you can add your Task ID to after
+# registering with the crete-task-cli. This variable supports a comma separated list:
+# TASKS="id1,id2,id3"
+# TASK_STAKES="1,1,1"
+TASKS="7jP87G1LJzWmLrr6RqQcA8bH6spZven4RHxGCgbPFzSo"
+TASK_STAKES=10
+
+# User can enter as many environment variables as they like below. These can be task
+# specific variables that are needed for the task to perform it's job. Some examples:
+# Secrets must follow this convention for task to be able to use it (SECRET_<secret name>)
+SECRET_WEB3_STORAGE_KEY=""
+TWITTER_CONSUMER_KEY=""
+TWITTER_CONSUMER_SECRET=""
+TWITTER_BEARER_TOKEN=""
+
+
+
+
+=== File: tests/unitTest.js ===
+
+-- Chunk 1 --
+// unitTest.js:4-63
+async function test_coreLogic() {
+  await coreLogic.task();
+  const submission = await coreLogic.fetchSubmission();
+  console.log(submission)
+  // const vote = await coreLogic.validateNode(submission, 1);
+  let vote = true;
+  const _dummyTaskState = {
+    submissions: {
+      1: {
+        '2NstaKU4kif7uytmS2PQi9P5M5bDLYSF2dhUNFhJbxHL': {
+          submission_value: '8164bb07ee54172a184bf35f267bc3f0052a90cd',
+          slot: 1889700,
+          round: 1,
+        },
+        '2NstaKU4kif7uytmS2PQi9P5M5bDLYSF2dhUNFhJbxHH': {
+          submission_value: '8164bb07ee54172a184bf35f267bc3f0052a90cc',
+          slot: 1890002,
+          round: 1,
+        },
+      },
+    },
+    submissions_audit_trigger: {
+      "1":{ // round number
+        "2NstaKU4kif7uytmS2PQi9P5M5bDLYSF2dhUNFhJbxHL":{ // Data Submitter (send data to K2)
+            "trigger_by":"2NstaKU4kif7uytmS2PQi9P5M5bDLYSF2dhUNFhJbxHH", // Audit trigger
+            "slot":1890002,
+            "votes":[{
+                "is_valid": false, // Submission is invalid(Slashed)
+                "voter":"2NstaKU4kif7uytmS2PQi9P5M5bDLYSF2dhUNFhJbxHZ", // Voter
+                "slot":1890003
+            }]
+        },
+        "2NstaKU4kif7uytmS2PQi9P5M5bDLYSF2dhUNFhJbxHH":{ // Data Submitter (send data to K2)
+          "trigger_by":"2NstaKU4kif7uytmS2PQi9P5M5bDLYSF2dhUNFhJbxHL", // Audit trigger
+          "slot":1890002,
+          "votes":[{
+              "is_valid": false, // Submission is invalid(Slashed)
+              "voter":"2NstaKU4kif7uytmS2PQi9P5M5bDLYSF2dhUNFhJbxHZ", // Voter
+              "slot":1890003
+          }]
+      }
+    }
+    },
+  };
+  if (vote == true) {
+    console.log('Submission is valid, generating distribution list');
+    const distributionList = await coreLogic.generateDistributionList(
+      1,
+      _dummyTaskState,
+    );
+    await coreLogic.validateDistribution(
+      null,
+      1,
+      distributionList,
+      _dummyTaskState,
+    );
+  } else {
+    console.log('Submission is invalid, not generating distribution list');
+  }
+}
